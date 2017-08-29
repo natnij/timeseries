@@ -3,12 +3,17 @@
 Created on Tue Jul  4 08:29:01 2017
 Common utilities
 
-@author: Nat
+@author: Nat 
 """
+import sys
+sys.path.append('D:\\projects\\demandForecast\\python\\')
 
 def pdDFtoArray(fullTs):
     '''
-    check input and convert pandas dataframes to numpy arrays
+    check input and convert pandas dataframes to numpy arrays.
+    
+    author: Nat
+    
     input: univariate timeseries in either pandas dataframe format or 
         numpy array format.
     output: always a 1d array.
@@ -23,7 +28,16 @@ def pdDFtoArray(fullTs):
 
 def regressMissingData(x, y, xnew, robust = True):
     '''
-    linear or robust linear regression to fill in missing data
+    linear or robust linear regression to fill in missing data.
+    
+    author: Nat
+    
+    input: 
+        x: independent variables with corresponding dependent variable y
+        xnew: independent variables with MISSING dependent variable y
+        y: dependent variable which is known
+    output:
+        ynew: regressed y value where y is missing       
     '''
     import pandas as pd
     from sklearn.linear_model import LinearRegression as lr
@@ -61,7 +75,11 @@ def regressMissingData(x, y, xnew, robust = True):
 # use kpss test for trend stationarity check
 def trendStationaryTest(fullTs, kpssRegType = 'c', significance = 5):
     '''
-    perform kpss test.
+    perform kpss test. 
+    
+    Calls statsmodels.tsa.stattools.kpss.
+    wrapper author: Nat    
+    
     input:
         fullTs: univariate timeseries to be tested. either in pandas.Dataframe 
             format with one column, or in numpy 1d array format.
@@ -83,7 +101,17 @@ def trendStationaryTest(fullTs, kpssRegType = 'c', significance = 5):
 
 def findTrendDiff(fullTs, maxD = 3, kpssRegType = 'c', significance = 5):
     '''
-    auto-differencing until kpss null hypothesis is true
+    auto-differencing until kpss null hypothesis is true.
+    
+    author: Nat     
+    
+    input:
+        fullTs: timeseries to be differenced.
+        maxD: maximum differencing order for trend differencing.
+        kpssRegType: argument to pass to kpss method.
+        significance: 5 is 5% 
+    output:
+        differencing order to ensure trend stationarity.
     '''
     import numpy as np
     tsArray = pdDFtoArray(fullTs)
@@ -101,6 +129,14 @@ def seasonalDummy(fullTs, frequency):
     '''
     generate seasonal dummy matrix using Fourier series 
     for Canova-Hansen test
+    
+    author: Nat
+
+    input:
+        fullTs: timeseries to be analyzed
+        frequency: frequency to be tested
+    output:
+        matrix with column vectors containing frequencies to be tested
     '''
     import numpy as np
     tsArray = pdDFtoArray(fullTs)
@@ -117,8 +153,18 @@ def seasonalDummy(fullTs, frequency):
 def SDtest(fullTs, frequency):
     '''
     based on R uroot test and forecast package from Hyndman
-    for reference see 
+    for coding reference see 
     https://github.com/robjhyndman/forecast/blob/master/R/arima.R
+    for math reference see
+    http://www.ssc.wisc.edu/~bhansen/papers/jbes_95.pdf
+    
+    author: Nat
+    
+    input:
+        fullTs: timeseries to be analyzed
+        frequency: frequency to be tested
+    output:
+        critical value as input to the wrapper CHtest
     '''
     import numpy as np
     if frequency <= 1:
@@ -158,9 +204,10 @@ def SDtest(fullTs, frequency):
     omnwplusTranspose = omnw + omnw.T
     omfhat = (cross + omnwplusTranspose) / float(Ne)
     
+    # potentially generalized Hannan's model to allow for unit root test at 
+    # a subset of the seaosnal frequencies. here A = eye
     sq = np.arange(0, frequency - 1, 2)
-    frecob = np.zeros(frequency - 1, dtype = int)
-    
+    frecob = np.zeros(frequency - 1, dtype = int)    
     for i in np.arange(0, len(frec)):
         if (frec[i] == 1) & (i + 1 == int(frequency / 2.0)):
             frecob[sq[i]] = 1
@@ -175,7 +222,11 @@ def SDtest(fullTs, frequency):
         if frecob[i] == 1:
             A[i, j] = 1
             j = j + 1
-        
+    
+    # tmp = A' \hat{\Omega}^f A 
+    # solved = G = (A' \hat{\Omega}^f A)^-1
+    # step4 = (A' \hat{\Omega}^f A)^-1 A' \sum_{i=1}^{n}\hat{F_i} \hat{F_i}^{\prime}A
+    # LM statistic = \frac{1}{n^2} trace((A' \hat{\Omega}^f A)^-1 A' \sum_{i=1}^{n}\hat{F_i} \hat{F_i}^{\prime}A)
     aTomfhat = np.matmul(A.T, omfhat)
     tmp = np.matmul(aTomfhat, A)
     
@@ -202,6 +253,9 @@ def CHtest(fullTs, frequency):
     critical values with different frequencies corresponding to 0.1 significance level
     http://www.ssc.wisc.edu/~bhansen/papers/jbes_95.pdf.(10% significance level)
     frequency > 12 : critical values are copied from R package forecast
+    
+    author: Nat
+    
     input:
         fullTs: univariate timeseries to be tested. either in pandas 
             dataframe or in numpy 1d array format.
@@ -223,13 +277,22 @@ def CHtest(fullTs, frequency):
                   8: 1.690, 9: 1.890, 10:2.100, 11:2.290, 12:2.490, 13:2.690,
                   24:5.098624, 52:10.341416, 365:65.44445}
     if frequency not in critValues.keys():
-        return chstat > 0.269 * np.power(frequency, 0.928)
+        return 'non-stationary' if chstat > 0.269 * np.power(frequency, 0.928) else 'seasonal-stationary'
     
     return 'non-stationary' if chstat > critValues.get(frequency) else 'seasonal-stationary'
 
 def findSeasonalDiff(fullTs, frequency, maxDD = 2):
     '''
     auto-seasonal-differencing until canova-hansen null hypothesis is true
+    
+    author: Nat
+    
+    input: 
+        fullTs: timeseries to be analyzed
+        frequency: frequency to be analyzed
+        maxDD: maximum differencing order for seasonal differencing
+    output:
+        seasonal differencing order to ensure timeseries seasonal stationarity
     '''
     import numpy as np
     tsArray = pdDFtoArray(fullTs)
@@ -246,6 +309,16 @@ def findSeasonalDiff(fullTs, frequency, maxDD = 2):
 def seasonalDetection(fullTs, recommendedFreq, significance = 5):
     '''
     return frequency as detected by acf and power density analysis
+    
+    author: Nat
+    
+    input: 
+        fullTs: timeseries to be analyzed
+        recommendedFreq: list of frequencies considered normal. if detected 
+            frequency is not on the list, a warning will appear
+        significance: 5 for 5%
+    output:
+        detected frequency with seasonality.
     '''
     tsArray = pdDFtoArray(fullTs)
     freq = 0
@@ -260,7 +333,11 @@ def seasonalDetection(fullTs, recommendedFreq, significance = 5):
 
 def myFft(fullTs, frequency):
     '''
-    simple power density check on given frequency
+    simple power density check on given frequency. 
+    
+    calls numpy.fft.fft method.
+    wrapper author: Nat
+    
     input:
         univariate timeseries
         frequency to be tested
@@ -290,6 +367,20 @@ def myFft(fullTs, frequency):
     return fftResult
 
 def myAcf(fullTs, frequency, significance = 5, unbiased = True):
+    '''
+    autocorrelation function.
+    
+    calls statsmodels.tsa.stattools.acf
+    wrapper author: Nat
+    
+    input:
+        fullTs: timeseries to be analyzed
+        frequency: frequency to be analyzed
+        significance: 5 for 5%
+        unbiased: if True then mean of the series is subtracted first.
+    output:
+        boolean, if seasonality exists at the frequency tested, then True.
+    '''
     from scipy.stats import norm
     import numpy as np
     from statsmodels.tsa.stattools import acf
@@ -312,6 +403,9 @@ def myAcf(fullTs, frequency, significance = 5, unbiased = True):
 def seasonalDiff(fullTs, frequency = 12, order = 1, padding = False):
     '''
     differencing with lag > 1.
+    
+    author: Nat
+    
     input:
         fullTs: univariate timeseries in pandas dataframe or numpy array.
         frequency: differencing lag.
@@ -354,6 +448,8 @@ def myTrendDiff(fullTs, order = 1, padding = True):
     wrapper for np.diff in case of padding.
     if padding == True: beginning of the original series will be copied to 
         the new diffedTs.
+    
+    author: Nat        
     '''
     import numpy as np
     tsArray = pdDFtoArray(fullTs)
@@ -386,6 +482,14 @@ def inverseTrendDiff(_originalTs, _diffedTs, order = 1):
     convert a differenced timeseries back to its original
     reference at 
     https://github.com/sryza/spark-timeseries/blob/master/src/main/scala/com/cloudera/sparkts/UnivariateTimeSeries.scala
+    
+    author: Nat
+    
+    input: 
+        _originalTs: before differencing. this is for reference to the start point when inversed.
+        _diffedTs: the series to be inversed.
+    output:
+        inversed timeseries
     '''
     import numpy as np
     originalTs = _originalTs.copy()
@@ -406,6 +510,18 @@ def inverseTrendDiff(_originalTs, _diffedTs, order = 1):
 def inverseSeasonalDiff(_originalTs, _diffedTs, frequency = 12, order = 1):
     '''
     convert a seasonal-differenced timeseries back to its original
+    
+    author: Nat
+    
+    input: 
+        _originalTs: before differencing. this is for reference to the start point when inversed.
+        _diffedTs: the series to be inversed.
+        frequency: frequency for seasonality. in inverse differencing this is 
+            needed for finding the correct lag.
+        order: layer of differencing to be inversed. corresponding to the 'D' parameter in 
+            a arima(p,d,q, P, D, Q, freq) model.
+    output:
+        inversed timeseries        
     '''
     import numpy as np
     originalTs = _originalTs.copy()
@@ -426,6 +542,17 @@ def inverseSeasonalDiff(_originalTs, _diffedTs, frequency = 12, order = 1):
     return addedTs    
 
 def inverseDiffAtLag(_diffedTs, lag = 1, startIndex = 1):
+    '''
+    internal function used in both inverseDiff functions.
+    
+    author: Nat
+    
+    input: 
+        _diffedTs: differenced timeseries to be inversed.
+        lag: number of lags
+        startIndex: first of the true series. before startIndex are all
+            reference (padding) points for the series begin.
+    '''
     diffedTs = _diffedTs.copy()    
     if lag == 0: 
         return diffedTs
@@ -448,6 +575,8 @@ def plotNormality(ts, ttl, figureDir):
     '''
     boxcox reference: https://stats.stackexchange.com/questions/61217/transforming-variables-for-multiple-regression-in-r
     scipy reference: https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.stats.boxcox.html
+    
+    author: Nat
     '''
     from scipy import stats
     import matplotlib.pyplot as plt
@@ -469,13 +598,28 @@ def plotNormality(ts, ttl, figureDir):
     return xt, boxcox_lambda
 
 def scoreR2(_yhat, _y, nCoeffs = 1, adjusted = True):
-    '''    
+    '''
+    calculate R-squared or adjusted R-squared based on number of observation points.
+    $$SS_{tot} = \sum_{i}(y_i - \bar{y})^2$$
+    $$SS_{res} = \sum_{i}(y_i - \hat{y}_i)^2$$
+    $$R^2 = 1 - \frac{SS_{res}}{SS_{tot}}$$
+    
     when-to-use-R2 reference:
         http://blog.minitab.com/blog/adventures-in-statistics-2/why-is-there-no-r-squared-for-nonlinear-regression
         http://people.duke.edu/~rnau/rsquared.htm
     which-adjusted-R2-to-use reference:
         https://stats.stackexchange.com/questions/25214/how-to-choose-between-the-different-adjusted-r2-formulas
     or: sklearn.metrics.r2_score
+    
+    author: Nat
+
+    input:
+        _yhat: the estimate
+        _y: the original
+        nCoeffs: number of estimators, this is for calculating degree of freedom in case adjusted = True.
+        adjusted: boolean, if calculation of R-squared should consider bias of small number of observations.
+    output:
+        R-squared or adjusted R-squared
     '''
     import numpy as np
     yhat = np.array(_yhat.copy())
@@ -494,9 +638,19 @@ def scoreR2(_yhat, _y, nCoeffs = 1, adjusted = True):
 
 def scoreRMSE(_yhat, _y):
     '''
+    calculate root mean squared error.
+    $$RMSE = \sqrt{\frac{\sum_{t=1}^{n} (\hat{y}_t - y_t)^2}{n}}$$
     when-to-use reference:
         https://people.duke.edu/~rnau/compare.htm
     or: sklearn.metrics.mean_squared_error, then square-root
+    
+    author: Nat
+
+    input:
+        _yhat: the estimate
+        _y: the original
+    output:
+        RMSE
     '''
     import numpy as np
     yhat = np.array(_yhat.copy())
@@ -508,9 +662,19 @@ def scoreRMSE(_yhat, _y):
     
 def scoreMAE(_yhat, _y):
     '''
+    calculate mean absolute error
+    $$MAE = \frac{\sum_{t=1}^{n} |\hat{y}_t - y_t|}{n}$$
     when-to-use reference:
         https://people.duke.edu/~rnau/compare.htm
     or: sklearn.metrics.mean_absolute_error
+    
+    author: Nat
+
+    input:
+        _yhat: the estimate
+        _y: the original    
+    output:
+        MAE
     '''
     import numpy as np
     yhat = np.array(_yhat.copy())
@@ -519,10 +683,20 @@ def scoreMAE(_yhat, _y):
 
 def scoreMAPE(_yhat, _y):
     '''
+    calculate mean absolute percentage error.
+    $$MAPE = \frac{100}{n} \sum_{t=1}^{n} | \frac{\hat{y}_t - y_t}{y_t} |$$
     only apply to data that are strictly positive!
     possible division by a number close to zero! use with caution!
     heavier penalty on positive errors than negative errors.
     function returns the percent number scaled to (0,100).
+    
+    author: Nat
+
+    input:
+        _yhat: the estimate
+        _y: the original    
+    output:
+        MAPE
     '''
     import numpy as np
     yhat = np.array(_yhat.copy())
@@ -531,8 +705,18 @@ def scoreMAPE(_yhat, _y):
 
 def scoreSymmetricMAPE(_yhat, _y):
     '''
+    calculate symmetric mean absolute percentage error (sMAPE)
+    $$SMAPE = \frac{100}{n} \sum_{t=1}^{n} \frac{|\hat{y}_t - y_t|}{(|\hat{y}_t| + |y_t|)/2}$$
     possible division by a number close to zero! use with caution!
     function returns the percent number scaled to 100, however can be negative.    
+    
+    author: Nat
+
+    input:
+        _yhat: the estimate
+        _y: the original    
+    output:
+        sMAPE    
     '''    
     import numpy as np
     yhat = np.array(_yhat.copy())
@@ -543,12 +727,21 @@ def scoreMASE(_yhat, _ytrain, _ytest, frequency = 0):
     '''
     mean absolute scaled error, Hyndman, R. J. (2006).
     compares forecast with the one-step (seasonal) naive forecast method.
+    definision without seasonality:
+        $$MASE = \frac{\sum_{t = 1}^{n} |\hat{y}_t - y_t|}{\frac{n}{n-1} \sum_{t=2}^{n} |y_t - y_{t-1}|}$$
+    definision with seasonality:
+        $$MASE = \frac{\sum_{t = 1}^{n} |\hat{y}_t - y_t|}{\frac{n}{n-m} \sum_{t=m+1}^{n} |y_t - y_{t-m}|}$$
     reference: https://robjhyndman.com/papers/foresight.pdf
                https://en.wikipedia.org/wiki/Mean_absolute_scaled_error
+    
+    author: Nat
+    
     input:
         ytrain: original timeseries in training set
         ytest: y_true in testset
         yhat: predicted y of testset
+    output:
+        MASE
     '''
     import numpy as np
     yhat = np.array(_yhat.copy())
@@ -568,6 +761,10 @@ def scoreMASE(_yhat, _ytrain, _ytest, frequency = 0):
     return error / d
 
 def myLr(x, y, xnew):
+    '''
+    calls sklearn.linear_model.LinearRegression
+    wrapper author: Nat
+    '''
     from sklearn.linear_model import LinearRegression as lr
     import numpy as np
     model = lr()
@@ -577,6 +774,10 @@ def myLr(x, y, xnew):
     return ynew
 
 def shiftLeft(_ar, step = 1):
+    '''
+    shift series to the left by step.
+    author: Nat
+    '''
     if step == 0:
         return _ar
     ar = _ar.copy()
@@ -585,6 +786,10 @@ def shiftLeft(_ar, step = 1):
     return ar
 
 def shiftRight(_ar, step = 1):
+    '''
+    shift series to the right by step.
+    author: Nat
+    '''
     if step == 0:
         return _ar
     ar = _ar.copy()
@@ -598,6 +803,18 @@ def mySma(x, histPeriod = 6, fcstPeriod = 18, weightDecayFactor = 2):
     weightDecayFactor defines speed of decay:
         weight[n-i] = weight[n] / weightDecayFactor^i,
         sum(weight) = 1
+    
+    author: Nat
+    
+    input:
+        x: original series
+        histPeriod: number of data points to consider from the past
+        fcstPeriod: number of data points to forecast into the future
+        weightDecayFactor: multiplier to immitate the decreasing
+            speed of importance if the data point is farther into the past.
+    output:
+        xfit: regressed value the length of the original series x.
+        xpred: forecast value length of fcstPeriod.
     '''
     import numpy as np
     weight = np.ones(histPeriod)
@@ -622,6 +839,18 @@ def myEwma(x, histPeriod = 6, fcstPeriod = 18):
     weighted_avg[n] = (1-alpha) * weighted_avg[n-1] + alpha * x[n],
     weighted_avg[0] = x[0],
     alpha = 2 / (span + 1)
+    
+    call panda.ewma method.
+    wrapper author: Nat
+
+    input:
+        x: original series
+        histPeriod: number of data points to consider from the past
+        fcstPeriod: number of data points to forecast into the future
+
+    output:
+        xfit: regressed value the length of the original series x.
+        xpred: forecast value length of fcstPeriod.
     '''
     from pandas import ewma
     import numpy as np
@@ -642,6 +871,13 @@ def findExog(timeseries, histPeriod = 3, fcstPeriod = 18,
              manualImpulse = None):
     '''
     find exogenous regressor for univariate timeseries
+    
+    calls statsmodels.api.nonparametric.lowess
+    calls sklearn.linear_model.RANSACRegressor
+    
+    otherwise:
+    author: Nat
+    
     input: 
         ts: either 1d for univariate timeseries, or multidimensional with last
             column being the dependent variable.
@@ -709,6 +945,7 @@ def findExog(timeseries, histPeriod = 3, fcstPeriod = 18,
     y = np.array(ts).copy()[:,-1].reshape(-1, 1)
    
     if method == 'lowess':
+        #http://www.stat.washington.edu/courses/stat527/s13/readings/Cleveland_JASA_1979.pdf
         lowess = sm.nonparametric.lowess(y.reshape(-1,), timeDim, frac=.3)
         lowess_y = np.array(list(zip(*lowess)))[1]
         
@@ -727,13 +964,20 @@ def findExog(timeseries, histPeriod = 3, fcstPeriod = 18,
         result = np.hstack([lowess_y.reshape(-1,), ynew.reshape(-1,)])
         x_exog = result.copy()
     elif method == 'robust_linear':
-        #use ransac regressor for robust linear regression
+        #use random sample consensus
+        #https://www.sri.com/sites/default/files/publications/ransac-publication.pdf
         from sklearn.linear_model import RANSACRegressor as ransac
-        model_ransac = ransac(lr())
+        model_ransac = ransac(lr(), random_state = 4711, max_trials = 10000)
         try:
-            model_ransac.fit(x, y)
-            ynew = model_ransac.predict(xnew)
-            ynew = np.where(ynew < 0, 0, ynew)
+            # random sampling in ransac. sample multiple times to get the mean.
+            tmp = np.zeros(xnew.shape[0])
+            for iteration in range(100):
+                model_ransac.fit(x, y)
+                ynew = model_ransac.predict(xnew)
+                ynew = np.where(ynew < 0, 0, ynew)
+                tmp = tmp.reshape(-1, 1) + ynew.reshape(-1, 1)
+            ynew = tmp / 100
+            
             if title is not None:
                 fig, ax = plt.subplots()
                 inlier_mask = model_ransac.inlier_mask_
@@ -849,6 +1093,16 @@ def isAdditive(timeseries, zeroReplacement = 1):
     '''
     simple function to determine if timeseries is additive or multiplicative 
     based on sum of squares of acf.
+    
+    calls statsmodels.api.tsa.seasonal_decompose
+    wrapper author: Nat
+    
+    input:
+        timeseries: series to be analyzed
+        zeroReplacement: if multiplicative: zero is not allowed. therefore 
+            replace zeros with the specified number (default is 1)
+    output:
+        boolean, if timeseries is additive, return True.
     '''
     import statsmodels.api as sm
     from statsmodels.tsa.stattools import acf
